@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rally Timer Pro</title>
+    <style>
+        :root {
+            --bg-color: #f4f4f9;
+            --text-color: #333;
+            --card-bg: #fff;
+            --primary: #0056b3;
+            --primary-hover: #004494;
+            --success: #28a745;
+            --danger: #dc3545;
+            --border: #ccc;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --card-bg: #1e1e1e;
+            --primary: #0d6efd;
+            --primary-hover: #0b5ed7;
+            --success: #198754;
+            --danger: #d32f2f;
+            --border: #444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+            padding: 10px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 2px solid var(--primary);
+            margin-bottom: 15px;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.1s;
+        }
+
+        button:active { transform: scale(0.98); }
+        button.btn-danger { background-color: var(--danger); }
+        button.btn-success { background-color: var(--success); }
+        button.btn-block { width: 100%; margin-top: 15px; }
+
+        .card {
+            background-color: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            margin-bottom: 15px;
+        }
+
+        .card h3 {
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+            color: var(--primary);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        input, select {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-size: 16px;
+            min-width: 70px;
+        }
+
+        .dashboard {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .big-time { font-size: 3rem; font-weight: bold; font-variant-numeric: tabular-nums; }
+        .big-dist { font-size: 1.5rem; color: var(--primary); margin-top: 5px; font-weight: bold; }
+
+        .point-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .point-info { display: flex; flex-direction: column; }
+        .point-title { font-weight: bold; font-size: 1.1rem; }
+        .point-meta { font-size: 0.9rem; opacity: 0.8; }
+
+        .delta-early { color: var(--success); font-weight: bold; }
+        .delta-late { color: var(--danger); font-weight: bold; }
+
+        .hidden { display: none !important; }
+
+        @media (max-width: 400px) {
+            .input-group { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2>Rally Timer Pro</h2>
+        <div>
+            <button id="toggleTimeBtn" onclick="toggleTimeMode()">Rel / Ass</button>
+            <button onclick="toggleTheme()">🌗 Tema</button>
+        </div>
+    </div>
+
+    <div id="setupSection">
+        
+        <div class="card">
+            <h3>Gestione Percorso</h3>
+            <div class="input-group">
+                <select id="savedRoutes"></select>
+                <button onclick="loadRoute()">Carica</button>
+                <button onclick="deleteRoute()" class="btn-danger">Elimina</button>
+            </div>
+            <div class="input-group" style="margin-top: 15px;">
+                <input type="text" id="routeName" placeholder="Nome nuovo percorso">
+                <button onclick="saveRoute()" class="btn-success">Salva</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Costruzione Percorso</h3>
+            <div class="input-group">
+                <input type="text" id="pName" placeholder="Etichetta (es. WP1)">
+                <input type="number" id="pKm" placeholder="Km tot." step="0.01">
+            </div>
+            <div class="input-group">
+                <input type="number" id="pMin" placeholder="Minuti progressivi">
+                <input type="number" id="pSec" placeholder="Secondi (0-59)">
+                <button onclick="addPoint()">Aggiungi Punto</button>
+            </div>
+            
+            <div id="routeList" style="margin-top: 20px;"></div>
+        </div>
+
+        <button onclick="prepareRace()" class="btn-success btn-block" style="padding: 15px; font-size: 1.2rem;">Vai alla Gara</button>
+    </div>
+
+    <div id="raceSection" class="hidden">
+        <button onclick="backToSetup()" style="margin-bottom:10px; background-color: var(--border); color: var(--text-color);">⬅ Modifica Percorso</button>
+        
+        <div class="card dashboard">
+            <div id="mainClock" class="big-time">00:00</div>
+            <div id="estDist" class="big-dist">Distanza stimata: 0.00 km</div>
+            <div style="margin-top: 20px; display: flex; gap:10px; justify-content: center;">
+                <button id="startBtn" onclick="startRace()" class="btn-success" style="flex:1; font-size:1.2rem; padding: 15px;">START</button>
+                <button onclick="stopRace()" class="btn-danger" style="flex:1; font-size:1.2rem; padding: 15px;">STOP / RESET</button>
+            </div>
+        </div>
+
+        <div class="card" id="checkpointsContainer">
+            <h3>Timbrature</h3>
+            <div id="racePointsList"></div>
+            
+            <div id="reportContainer" class="hidden" style="margin-top: 20px; text-align: center;">
+                <button onclick="generateReport()" class="btn-primary btn-block" style="padding: 15px; font-size: 1.1rem;">📄 Scarica Report Gara HTML</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    let points = [];
+    let startTime = null;
+    let timerInterval = null;
+    let isAbsoluteTime = false;
+
+    // --- GESTIONE TEMI ---
+    function toggleTheme() {
+        const root = document.documentElement;
+        const currentTheme = root.getAttribute('data-theme');
+        root.setAttribute('data-theme', currentTheme === 'dark' ? 'light' : 'dark');
+    }
+
+    function toggleTimeMode() {
+        isAbsoluteTime = !isAbsoluteTime;
+        // Aggiorna dashboard solo se la gara non è finita
+        const isComplete = points.length > 0 && points.every(p => p.actualTime !== null);
+        if (isComplete && points.length > 0) {
+            const lastElapsed = points[points.length - 1].actualTime;
+            document.getElementById('mainClock').innerText = formatTimeDisplay(lastElapsed);
+        } else {
+            updateDashboard();
+        }
+        renderRacePoints();
+    }
+
+    // --- FUNZIONI DI FORMATTAZIONE ---
+    function formatTimeDisplay(totalSeconds) {
+        if (isAbsoluteTime && startTime) {
+            const d = new Date(startTime + (totalSeconds * 1000));
+            return d.toLocaleTimeString('it-IT', { hour12: false });
+        }
+        const sign = totalSeconds < 0 ? "-" : "";
+        const absSec = Math.abs(Math.round(totalSeconds));
+        const m = Math.floor(absSec / 60).toString().padStart(2, '0');
+        const s = (absSec % 60).toString().padStart(2, '0');
+        return `${sign}${m}:${s}`;
+    }
+
+    function formatDeltaHTML(deltaSec, label) {
+        const roundedDelta = Math.round(deltaSec);
+        const sign = roundedDelta > 0 ? "+" : (roundedDelta < 0 ? "-" : "");
+        const absSec = Math.abs(roundedDelta);
+        const m = Math.floor(absSec / 60).toString().padStart(2, '0');
+        const s = (absSec % 60).toString().padStart(2, '0');
+        
+        let colorClass = "";
+        let txt = "Perfetto";
+        if (roundedDelta > 0) {
+            colorClass = "delta-late";
+            txt = "Ritardo";
+        } else if (roundedDelta < 0) {
+            colorClass = "delta-early";
+            txt = "Anticipo";
+        }
+        
+        return `<div class="${colorClass}">${label}: ${sign}${m}:${s} (${txt})</div>`;
+    }
+
+    function formatDeltaTextReport(deltaSec) {
+        if (deltaSec === null) return "-";
+        const roundedDelta = Math.round(deltaSec);
+        if (roundedDelta === 0) return "0s";
+        const sign = roundedDelta > 0 ? "+" : "-";
+        const absSec = Math.abs(roundedDelta);
+        const m = Math.floor(absSec / 60).toString().padStart(2, '0');
+        const s = (absSec % 60).toString().padStart(2, '0');
+        return `${sign}${m}:${s}`;
+    }
+
+    // --- COSTRUZIONE PERCORSO ---
+    function addPoint() {
+        const label = document.getElementById('pName').value || `WP ${points.length + 1}`;
+        const km = parseFloat(document.getElementById('pKm').value);
+        const min = parseInt(document.getElementById('pMin').value) || 0;
+        const sec = parseInt(document.getElementById('pSec').value) || 0;
+
+        if (isNaN(km) || km <= 0) return alert("Inserisci un chilometraggio valido");
+        
+        const targetSeconds = (min * 60) + sec;
+        
+        points.push({ 
+            id: Date.now(), 
+            label, 
+            km, 
+            targetTime: targetSeconds,
+            actualTime: null,
+            deltaCumulative: null,
+            deltaSegment: null
+        });
+        
+        points.sort((a, b) => a.km - b.km);
+        
+        document.getElementById('pName').value = '';
+        document.getElementById('pKm').value = '';
+        document.getElementById('pMin').value = '';
+        document.getElementById('pSec').value = '';
+        
+        renderSetupPoints();
+    }
+
+    function renderSetupPoints() {
+        const list = document.getElementById('routeList');
+        list.innerHTML = '';
+        let prevKm = 0;
+        let prevTime = 0;
+
+        points.forEach((p, index) => {
+            const dKm = p.km - prevKm;
+            const dTimeHours = (p.targetTime - prevTime) / 3600;
+            const avgSpeed = dTimeHours > 0 ? (dKm / dTimeHours).toFixed(1) : 0;
+
+            const div = document.createElement('div');
+            div.className = 'point-item';
+            div.innerHTML = `
+                <div class="point-info">
+                    <span class="point-title">${p.label} - ${p.km} km</span>
+                    <span class="point-meta">Target: ${Math.floor(p.targetTime/60)}m ${p.targetTime%60}s | Media Settore: ${avgSpeed} km/h</span>
+                </div>
+                <button class="btn-danger" onclick="removePoint(${index})">X</button>
+            `;
+            list.appendChild(div);
+            
+            prevKm = p.km;
+            prevTime = p.targetTime;
+        });
+    }
+
+    function removePoint(index) {
+        points.splice(index, 1);
+        renderSetupPoints();
+    }
+
+    // --- SALVATAGGIO / CARICAMENTO / ELIMINAZIONE ---
+    function updateRouteDropdown() {
+        const saved = JSON.parse(localStorage.getItem('rallyRoutes') || '{}');
+        const select = document.getElementById('savedRoutes');
+        select.innerHTML = '';
+        for (let name in saved) {
+            let opt = document.createElement('option');
+            opt.value = name;
+            opt.innerText = name;
+            select.appendChild(opt);
+        }
+    }
+
+    function saveRoute() {
+        const name = document.getElementById('routeName').value;
+        if (!name || points.length === 0) return alert("Inserisci un nome e aggiungi punti al percorso.");
+        
+        const saved = JSON.parse(localStorage.getItem('rallyRoutes') || '{}');
+        saved[name] = points;
+        localStorage.setItem('rallyRoutes', JSON.stringify(saved));
+        alert("Percorso salvato!");
+        updateRouteDropdown();
+    }
+
+    function loadRoute() {
+        const select = document.getElementById('savedRoutes');
+        const name = select.value;
+        if (!name) return;
+        
+        const saved = JSON.parse(localStorage.getItem('rallyRoutes') || '{}');
+        if (saved[name]) {
+            points = saved[name];
+            points.forEach(p => { p.actualTime = null; p.deltaCumulative = null; p.deltaSegment = null; });
+            document.getElementById('routeName').value = name;
+            renderSetupPoints();
+        }
+    }
+
+    function deleteRoute() {
+        const select = document.getElementById('savedRoutes');
+        const name = select.value;
+        if (!name) return;
+        
+        if (!confirm(`Vuoi davvero eliminare definitivamente il percorso "${name}"?`)) return;
+        
+        const saved = JSON.parse(localStorage.getItem('rallyRoutes') || '{}');
+        delete saved[name];
+        localStorage.setItem('rallyRoutes', JSON.stringify(saved));
+        updateRouteDropdown();
+    }
+
+    // --- LOGICA DI GARA ---
+    function prepareRace() {
+        if (points.length === 0) return alert("Il percorso è vuoto. Aggiungi dei punti prima di andare in gara.");
+        document.getElementById('setupSection').classList.add('hidden');
+        document.getElementById('raceSection').classList.remove('hidden');
+        document.getElementById('reportContainer').classList.add('hidden');
+        document.getElementById('estDist').classList.remove('delta-early');
+        renderRacePoints();
+        updateDashboard();
+    }
+
+    function backToSetup() {
+        if (startTime) {
+            if(!confirm("ATTENZIONE: Una gara è in corso. Tornare alla modifica fermerà e azzererà il cronometro. Vuoi procedere?")) return;
+            resetRaceData();
+        }
+        document.getElementById('setupSection').classList.remove('hidden');
+        document.getElementById('raceSection').classList.add('hidden');
+    }
+
+    function startRace() {
+        if (startTime) return;
+        startTime = Date.now();
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('estDist').classList.remove('delta-early');
+        
+        timerInterval = setInterval(() => {
+            updateDashboard();
+        }, 200);
+    }
+
+    function stopRace() {
+        if (startTime) {
+            if (!confirm("Sei sicuro di voler FERMARE e RESETTARE i dati della gara in corso? I dati attuali andranno persi.")) return;
+        }
+        resetRaceData();
+    }
+
+    function resetRaceData() {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        startTime = null;
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('reportContainer').classList.add('hidden');
+        document.getElementById('estDist').classList.remove('delta-early');
+        points.forEach(p => { p.actualTime = null; p.deltaCumulative = null; p.deltaSegment = null; });
+        updateDashboard();
+        renderRacePoints();
+    }
+
+    function getElapsedSeconds() {
+        if (!startTime) return 0;
+        return (Date.now() - startTime) / 1000;
+    }
+
+    function updateDashboard() {
+        const elapsed = getElapsedSeconds();
+        
+        const clockStr = isAbsoluteTime && !startTime 
+            ? "Premi Start" 
+            : formatTimeDisplay(elapsed);
+        document.getElementById('mainClock').innerText = clockStr;
+
+        let refKm = 0;
+        let refTime = 0;
+        let currentTarget = null;
+        
+        for (let i = 0; i < points.length; i++) {
+            if (points[i].actualTime !== null) {
+                refKm = points[i].km;
+                refTime = points[i].actualTime;
+            } else {
+                currentTarget = points[i];
+                break;
+            }
+        }
+
+        let estDist = refKm;
+
+        if (currentTarget) {
+            const dt = currentTarget.targetTime - refTime;
+            const dKm = currentTarget.km - refKm;
+            let speed = 0;
+            
+            if (dt > 0) {
+                speed = dKm / dt;
+            } else {
+                const prevIndex = points.indexOf(currentTarget) - 1;
+                const prevTargetTime = prevIndex >= 0 ? points[prevIndex].targetTime : 0;
+                const prevTargetKm = prevIndex >= 0 ? points[prevIndex].km : 0;
+                const theoreticalSpeed = (currentTarget.km - prevTargetKm) / (currentTarget.targetTime - prevTargetTime);
+                speed = theoreticalSpeed > 0 ? theoreticalSpeed : 0;
+            }
+            
+            const timeInSegment = elapsed - refTime;
+            estDist = refKm + (speed * timeInSegment);
+        } else if (points.length > 0) {
+            estDist = points[points.length - 1].km;
+        }
+
+        document.getElementById('estDist').innerText = `Distanza stimata: ${Math.max(0, estDist).toFixed(2)} km`;
+    }
+
+    function stampPoint(index) {
+        if (!startTime) return alert("Avvia la gara prima di timbrare!");
+        
+        const elapsed = Math.round(getElapsedSeconds());
+        const target = points[index].targetTime;
+        
+        const cumulativeDelta = elapsed - target;
+        
+        let prevCumulativeDelta = 0;
+        let prevIndex = index - 1;
+        while (prevIndex >= 0 && points[prevIndex].actualTime === null) {
+            prevIndex--;
+        }
+        if (prevIndex >= 0) {
+            prevCumulativeDelta = points[prevIndex].deltaCumulative;
+        }
+
+        const segmentDelta = cumulativeDelta - prevCumulativeDelta;
+        
+        points[index].actualTime = elapsed;
+        points[index].deltaCumulative = cumulativeDelta;
+        points[index].deltaSegment = segmentDelta;
+        
+        renderRacePoints();
+        updateDashboard();
+        checkRaceStatus();
+    }
+
+    function checkRaceStatus() {
+        const isComplete = points.length > 0 && points.every(p => p.actualTime !== null);
+        if (isComplete) {
+            // Ferma l'aggiornamento automatico
+            clearInterval(timerInterval);
+            timerInterval = null;
+            
+            // Fissa il main clock sull'esatto tempo dell'ultima timbratura
+            const lastElapsed = points[points.length - 1].actualTime;
+            document.getElementById('mainClock').innerText = formatTimeDisplay(lastElapsed);
+            
+            // Cambia l'indicatore della distanza con un messaggio di fine gara
+            const estDistEl = document.getElementById('estDist');
+            estDistEl.innerText = "GARA COMPLETATA";
+            estDistEl.classList.add('delta-early'); // Per colorarlo di verde (success)
+
+            document.getElementById('reportContainer').classList.remove('hidden');
+        }
+    }
+
+    function renderRacePoints() {
+        const list = document.getElementById('racePointsList');
+        list.innerHTML = '';
+
+        points.forEach((p, index) => {
+            const div = document.createElement('div');
+            div.className = 'point-item';
+            
+            let actionArea = '';
+            if (p.actualTime !== null) {
+                actionArea = `
+                    <div style="text-align: right; font-size: 0.95rem; line-height: 1.3;">
+                        <div style="font-weight: bold; margin-bottom: 2px;">Effettivo: ${formatTimeDisplay(p.actualTime)}</div>
+                        ${formatDeltaHTML(p.deltaSegment, "Settore")}
+                        ${formatDeltaHTML(p.deltaCumulative, "Totale")}
+                    </div>
+                `;
+            } else {
+                actionArea = `<button class="btn-primary" onclick="stampPoint(${index})" style="padding: 15px 25px;">TIMBRA</button>`;
+            }
+
+            div.innerHTML = `
+                <div class="point-info">
+                    <span class="point-title">${p.label} - ${p.km} km</span>
+                    <span class="point-meta">Teorico: ${formatTimeDisplay(p.targetTime)}</span>
+                </div>
+                ${actionArea}
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    // --- GENERAZIONE REPORT HTML ---
+    function generateReport() {
+        const d = new Date();
+        const dateStr = d.toLocaleDateString('it-IT') + ' ' + d.toLocaleTimeString('it-IT');
+        
+        // Estrazione ora esatta di Start
+        const startStr = startTime ? new Date(startTime).toLocaleTimeString('it-IT') : "N/D";
+
+        let htmlContent = `
+        <!DOCTYPE html>
+        <html lang="it">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Report Gara Rally</title>
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; max-width: 800px; margin: auto; }
+                h1 { color: #0056b3; border-bottom: 2px solid #0056b3; padding-bottom: 10px; margin-bottom: 15px; }
+                .meta-info { background: #f4f4f9; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+                .meta-info p { margin: 5px 0; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
+                th { background-color: #0056b3; color: white; font-weight: bold; }
+                tr:nth-child(even) { background-color: #f9f9f9; }
+                .late { color: #dc3545; font-weight: bold; }
+                .early { color: #28a745; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <h1>Report Tempi di Gara</h1>
+            <div class="meta-info">
+                <p><strong>Orario di Partenza (START):</strong> ${startStr}</p>
+                <p><strong>Data di generazione report:</strong> ${dateStr}</p>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Punto</th>
+                        <th>Chilometri</th>
+                        <th>Tempo Teorico</th>
+                        <th>Tempo Effettivo</th>
+                        <th>Scostamento Settore</th>
+                        <th>Scostamento Totale</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        points.forEach(p => {
+            const isLateSegment = p.deltaSegment > 0;
+            const isEarlySegment = p.deltaSegment < 0;
+            const segmentClass = isLateSegment ? 'late' : (isEarlySegment ? 'early' : '');
+            
+            const isLateTotal = p.deltaCumulative > 0;
+            const isEarlyTotal = p.deltaCumulative < 0;
+            const totalClass = isLateTotal ? 'late' : (isEarlyTotal ? 'early' : '');
+
+            htmlContent += `
+                <tr>
+                    <td><strong>${p.label}</strong></td>
+                    <td>${p.km.toFixed(2)} km</td>
+                    <td>${formatTimeDisplay(p.targetTime)}</td>
+                    <td>${p.actualTime !== null ? formatTimeDisplay(p.actualTime) : '-'}</td>
+                    <td class="${segmentClass}">${formatDeltaTextReport(p.deltaSegment)}</td>
+                    <td class="${totalClass}">${formatDeltaTextReport(p.deltaCumulative)}</td>
+                </tr>
+            `;
+        });
+
+        htmlContent += `
+                </tbody>
+            </table>
+        </body>
+        </html>
+        `;
+
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Report_Rally_${Date.now()}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // Init base
+    updateRouteDropdown();
+    updateDashboard();
+
+</script>
+</body>
+</html>
