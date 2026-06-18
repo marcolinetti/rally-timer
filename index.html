@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reindirizzamento in corso...</title>
+    
+    <!-- Metodo 1: Redirect tramite Meta Tag (consigliato per HTML puro) -->
+    <meta http-equiv="refresh" content="0; url=rally.html">
+    
+    <!-- Metodo 2: Redirect tramite JavaScript (backup veloce) -->
+    <script>
+        window.location.replace("rally.html");
+    </script>
+</head>
+<body>
+    <!-- Fallback nel caso in cui il redirect automatico sia bloccato dal browser -->
+    <p>Se non vieni reindirizzato automaticamente, <a href="rally.html">clicca qui per continuare verso rally.html</a>.</p>
+</body>
+</html>
